@@ -1,0 +1,43 @@
+name: Deploy to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Copy Order Service to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} "mkdir -p order-service"
+          scp -r ./order-service/* ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/home/ubuntu/order-service
+
+      - name: Copy Inventory Service to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} "mkdir -p inventory-service"
+          scp -r ./inventory-service/* ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/home/ubuntu/inventory-service
+
+      - name: Run Deployment Script on EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
+            cd order-service
+            docker build -t order-service .
+            docker stop order-service || true && docker rm order-service || true
+            docker run -d --name order-service -p 8080:8080 order-service
+
+            cd ../inventory-service
+            docker build -t inventory-service .
+            docker stop inventory-service || true && docker rm inventory-service || true
+            docker run -d --name inventory-service -p 8081:8081 inventory-service
+          EOF
