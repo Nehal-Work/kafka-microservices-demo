@@ -1,0 +1,10 @@
+server:
+  port: 8081
+  address: 0.0.0.0
+
+spring:
+  kafka:
+    bootstrap-servers: kafka:9092
+    consumer:
+      group-id: inventory-group
+      auto-offset-reset: earliest
