@@ -7,4 +7,4 @@ spring:
     bootstrap-servers: kafka:9092
     consumer:
       group-id: inventory-group
-      auto-offset-reset: earliest"// test deployment" 
+      auto-offset-reset: earliest

@@ -1,67 +1,27 @@
-name: Deploy to AWS EC2
+name: Deploy to EC2
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]   # Trigger on push to main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up SSH
-        uses: webfactory/ssh-agent@v0.7.0
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-      - name: Copy code to EC2
+      - name: Deploy to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} "mkdir -p kafka-deploy"
-          scp -r ./* ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/home/ubuntu/kafka-deploy
-
-      - name: Run deployment script on EC2
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
-            cd kafka-deploy
-
-            echo "Creating Docker network..."
-            docker network create kafka-network || true
-
-            echo "Starting Zookeeper..."
-            docker run -d --name zookeeper \
-              --network kafka-network \
-              -p 2181:2181 \
-              -e ZOOKEEPER_CLIENT_PORT=2181 \
-              confluentinc/cp-zookeeper:7.3.0
-
-            echo "Starting Kafka..."
-            docker run -d --name kafka \
-              --network kafka-network \
-              -p 9092:9092 \
-              -e KAFKA_BROKER_ID=1 \
-              -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
-              -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092 \
-              -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
-              confluentinc/cp-kafka:7.3.0
-
-            echo "Deploying Order Service..."
-            cd order-service
-            docker build -t order-service .
-            docker stop order-service || true && docker rm order-service || true
-            docker run -d --name order-service \
-              --network kafka-network \
-              -p 8081:8081 order-service
-            cd ..
-
-            echo "Deploying Inventory Service..."
-            cd inventory-service
-            docker build -t inventory-service .
-            docker stop inventory-service || true && docker rm inventory-service || true
-            docker run -d --name inventory-service \
-              --network kafka-network \
-              -p 8080:8080 inventory-service
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+            cd kafka-microservices-demo
+            git pull origin main
+            docker-compose down -v
+            docker-compose up --build -d
           EOF
