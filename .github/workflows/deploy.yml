@@ -18,6 +18,11 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
+    - name: Give Maven Wrapper Execute Permission
+      run: |
+        chmod +x ./order-service/mvnw
+        chmod +x ./inventory-service/mvnw
+
     - name: Build Services
       run: |
         cd order-service && ./mvnw clean package -DskipTests && cd ..
@@ -29,7 +34,7 @@ jobs:
         host: ${{ secrets.EC2_HOST }}
         username: ubuntu
         key: ${{ secrets.EC2_SSH_KEY }}
-        source: "."
+        source: "."  # Copies all files, including JARs
         target: "kafka-microservices-demo"
 
     - name: SSH and Deploy on EC2
@@ -40,5 +45,5 @@ jobs:
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
           cd kafka-microservices-demo
-          docker-compose down -v
+          docker-compose down -v || true
           docker-compose up --build -d
