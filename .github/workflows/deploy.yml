@@ -1,27 +1,44 @@
-name: Deploy to EC2
+name: Deploy Microservices to AWS
 
 on:
   push:
-    branches: [main]   # Trigger on push to main
+    branches: [main]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    - name: Checkout Code
+      uses: actions/checkout@v3
 
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.8.0
-        with:
-          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+    - name: Set up Java
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
 
-      - name: Deploy to EC2
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
-            cd kafka-microservices-demo
-            git pull origin main
-            docker-compose down -v
-            docker-compose up --build -d
-          EOF
+    - name: Build Services
+      run: |
+        cd order-service && ./mvnw clean package -DskipTests && cd ..
+        cd inventory-service && ./mvnw clean package -DskipTests && cd ..
+
+    - name: Copy Files to EC2
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ubuntu
+        key: ${{ secrets.EC2_SSH_KEY }}
+        source: "."
+        target: "kafka-microservices-demo"
+
+    - name: SSH and Deploy on EC2
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ubuntu
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          cd kafka-microservices-demo
+          docker-compose down -v
+          docker-compose up --build -d
